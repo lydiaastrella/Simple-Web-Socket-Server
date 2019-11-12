@@ -89,16 +89,19 @@ def mainThread(conn, addr):
                     
             conn.sendall(handShake(key))
 
-            i = 1
+            #j = 1
             while True:
-                frame = bytearray(conn.recv(65536))
+                #print(j)
+                #j = j + 1
                 while True:
+                    frame = bytearray(conn.recv(65536))
                     byte1 = frame[0]
                     fin = byte1 >> 7
                     opcode = byte1 & 0x0F
 
                     if (opcode == 0x8):
-                        break
+                        return 
+                        #kirim close
                     if (opcode == 0x1):
                         isText = True
                         data = b''
@@ -108,20 +111,30 @@ def mainThread(conn, addr):
 
                     data += decodeFrame(frame, data)
                     if (fin == 1):
+                        #print("fin " + str(j))
                         break
 
                 if (isText):
-                    print(data)
+                    #print(data)
                     decoded_data = data.decode()
-                    if (decoded_data.find("!echo ",0,6)==0):
+                    if ("!echo " in decoded_data):
+                        #print("masuk !echo")
                         phrase = decoded_data.replace("!echo ", "")
                         listFrame = build_frame(data, isText)
                         for i in listFrame :
                             conn.sendall(i)
-                    elif ("!submission"):
-                        #print("!submission")
-                        
-                        #kirim source code
+                    elif ("!submission" in decoded_data):
+                        #print("masuk !submission")
+                        try:
+                            file = open("Simple-Websocket-Server.zip",'rb')
+                        except IOError:
+                            print('Unable to open', filename)
+                            return    
+                        bytes_from_file = file.read()
+                        listFrame = build_frame(bytes_from_file,False) #isText is False
+                        for i in listFrame :
+                            conn.sendall(i)
+                        #print("beres !submission")
                 else:
                     print("!bukan text")
                     #cek cheksum 
