@@ -2,6 +2,17 @@ import socket
 import base64
 import hashlib
 
+def handShake(key):
+    key = key + MAGIC_STRING
+    key = key.encode()
+
+    responseKey = base64.b64encode(hashlib.sha1(key).digest()).decode()
+    response = "HTTP/1.1 101 Switching Protocols\r\n" + \
+            "Upgrade: websocket\r\n" + \
+            "Connection: Upgrade\r\n" + \
+            "Sec-WebSocket-Accept: %s\r\n\r\n"%(responseKey)
+    return (response.encode())
+
 def decodeFrame(frame, data) :
     byte2 = frame[1]
     mask = byte2 >> 7
@@ -42,16 +53,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 for x in headers :
                     if "Sec-WebSocket-Key:" in x:
                         key = x.split(" ")[1]
-                        key = key + MAGIC_STRING
-                        key = key.encode()
-                
-                responseKey = base64.b64encode(hashlib.sha1(key).digest()).decode()
-                response = "HTTP/1.1 101 Switching Protocols\r\n" + \
-                            "Upgrade: websocket\r\n" + \
-                            "Connection: Upgrade\r\n" + \
-                            "Sec-WebSocket-Accept: %s\r\n\r\n"%(responseKey)
-                response = response.encode()
-                conn.sendall(response)
+                        
+                conn.sendall(handShake(key))
 
                 i = 1
                 while True:
