@@ -1,6 +1,7 @@
 import socket
 import base64
 import hashlib
+import threading
 
 def handShake(key):
     key = key + MAGIC_STRING
@@ -36,59 +37,99 @@ HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
 PORT = 8080        # Port to listen on (non-privileged ports are > 1023)
 MAGIC_STRING = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11" #string to concatenate to key
 
+def build_frame(data, isText):
+    listFrame = []
+    frame = b''
+    mask = 0x0
+
+    if (isText):
+        opcode = 0x1
+    else :
+        opcode = 0x2
+    
+    if (len(data)//125 == 0):
+        fin = 0x1
+        payload_len = len(data)
+        byte1 = fin << 7 | opcode
+        byte2 = mask << 7 | payload_len
+        frame = bytes(byte1 + byte2) + data
+        listFrame.append(frame)
+    else :
+        for i in range(len(data)//125):
+            if ((i == len(data)//125 -1)  and (len(data) % 125 == 0)):
+                fin = 0x1
+            else :
+                fin = 0x0
+            payload_len = 125
+            byte1 = fin << 7 | opcode
+            byte2 = mask << 7 | payload_len
+            frame = bytes(byte1 + byte2) + data[i*125 : (i+1) *125]
+            listFrame.append(frame)
+        if (len(data) % 125 != 0):
+            fin = 0x1
+            payload_len = len(data) % 125
+            byte1 = fin << 7 | opcode
+            byte2 = mask << 7 | payload_len
+            frame = bytes(byte1 + byte2) + data[(len(data)//125)*125 :]
+            listFrame.append(frame)
+    return listFrame
+
+def mainThread(conn, addr):
+    print('Connected by', addr)
+    while True:
+        data = conn.recv(1024)
+        if not data:
+            break
+        dataDecoded = data.decode()
+        headers = dataDecoded.split("\r\n")
+        if "Connection: Upgrade" in dataDecoded and "Upgrade: websocket" in dataDecoded :
+            for x in headers :
+                if "Sec-WebSocket-Key:" in x:
+                    key = x.split(" ")[1]
+                    
+            conn.sendall(handShake(key))
+
+            i = 1
+            while True:
+                frame = bytearray(conn.recv(65536))
+                while True:
+                    byte1 = frame[0]
+                    fin = byte1 >> 7
+                    opcode = byte1 & 0x0F
+
+                    if (opcode == 0x8):
+                        break
+                    if (opcode == 0x1):
+                        isText = True
+                        data = b''
+                    elif (opcode == 0x2):
+                        isText = False
+                        data = b''
+
+                    data += decodeFrame(frame, data)
+                    if (fin == 1):
+                        break
+
+                if (isText):
+                    print(data)
+                    decoded_data = data.decode()
+                    if (decoded_data.find("!echo ",0,6)==0):
+                        phrase = decoded_data.replace("!echo ", "")
+                        listFrame = build_frame(data, isText)
+                        for i in listFrame :
+                            conn.sendall(i)
+                    elif ("!submission"):
+                        #print("!submission")
+                        
+                        #kirim source code
+                else:
+                    print("!bukan text")
+                    #cek cheksum 
+                        
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    s.bind((HOST, PORT))
-    s.listen()
-    conn, addr = s.accept()
-    with conn:
-        print('Connected by', addr)
+        s.bind((HOST, PORT))
+        s.listen()
         while True:
-            data = conn.recv(1024)
-            if not data:
-                break
-            dataDecoded = data.decode()
-            headers = dataDecoded.split("\r\n")
-            if "Connection: Upgrade" in dataDecoded and "Upgrade: websocket" in dataDecoded :
-                for x in headers :
-                    if "Sec-WebSocket-Key:" in x:
-                        key = x.split(" ")[1]
-                        
-                conn.sendall(handShake(key))
-
-                i = 1
-                while True:
-                    frame = bytearray(conn.recv(65536))
-                    while True:
-                        byte1 = frame[0]
-                        fin = byte1 >> 7
-                        opcode = byte1 & 0x0F
-                        
-                        if (opcode == 0x8):
-                            break
-                        if (opcode == 0x1):
-                            isText = True
-                            data = b''
-                        elif (opcode == 0x2):
-                            isText = False
-                            data = b''
-
-                        data += decodeFrame(frame, data)
-                        if (fin == 1):
-                            break
-
-                    if (isText):
-                        print(data)
-                        decoded_data = data.decode()
-                        if (decoded_data.find("!echo ",0,6)==0):
-                            phrase = decoded_data.replace("!echo ", "")
-                            
-
-                            conn.sendall(phrase.encode())
-                        elif ("!submission"):
-                            print("!submission")
-                            #kirim source code
-                    else:
-                        print("!bukan text")
-                        #cek cheksum 
-                    
+            conn, addr = s.accept()
+            threading.Thread(target=mainThread, args=(conn, addr), daemon=True).start()
