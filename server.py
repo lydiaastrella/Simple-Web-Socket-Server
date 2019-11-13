@@ -14,7 +14,24 @@ def handShake(key):
             "Sec-WebSocket-Accept: %s\r\n\r\n"%(responseKey)
     return (response.encode())
 
-def decodeFrame(frame, data) :
+def build_close_frame(frame):
+    data = decodeFrame(frame)
+    fin= 0x1
+    opcode = 0x8
+    mask = 0x0
+    if(len(data)<=125):
+        payload_len = len(data)
+        byte1 = fin << 7 | opcode
+        byte2 = mask << 7 | payload_len
+        frame = bytes([byte1]) + bytes([byte2]) + data
+    else:
+        payload_len = 125
+        byte1 = fin << 7 | opcode
+        byte2 = mask << 7 | payload_len
+        frame = bytes([byte1]) + bytes([byte2]) + data[0:125]
+    return frame
+
+def decodeFrame(frame) :
     byte2 = frame[1]
     mask = byte2 >> 7
     payload_len = byte2 & 0x7F
@@ -29,9 +46,10 @@ def decodeFrame(frame, data) :
         maskingKey = frame[10:14]
         startPayload = 14
 
+    frame_data=b''
     for i in range (startPayload, len(frame)):
-        data += bytes([frame[i] ^ maskingKey[(i - startPayload)%4]])
-    return data
+        frame_data += bytes([frame[i] ^ maskingKey[(i - startPayload)%4]])
+    return frame_data
 
 HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
 PORT = 8080        # Port to listen on (non-privileged ports are > 1023)
@@ -48,11 +66,13 @@ def build_frame(data, isText):
         opcode = 0x2
     
     if (len(data)//125 == 0):
+        print('div 125 = 0')
         fin = 0x1
         payload_len = len(data)
         byte1 = fin << 7 | opcode
         byte2 = mask << 7 | payload_len
-        frame = bytes(byte1 + byte2) + data
+        frame = bytes([byte1]) + bytes([byte2]) + data
+        #print(frame)
         listFrame.append(frame)
     else :
         for i in range(len(data)//125):
@@ -63,14 +83,14 @@ def build_frame(data, isText):
             payload_len = 125
             byte1 = fin << 7 | opcode
             byte2 = mask << 7 | payload_len
-            frame = bytes(byte1 + byte2) + data[i*125 : (i+1) *125]
+            frame = bytes([byte1]) + bytes([byte2]) + data[i*125 : (i+1) *125]
             listFrame.append(frame)
         if (len(data) % 125 != 0):
             fin = 0x1
             payload_len = len(data) % 125
             byte1 = fin << 7 | opcode
             byte2 = mask << 7 | payload_len
-            frame = bytes(byte1 + byte2) + data[(len(data)//125)*125 :]
+            frame = bytes([byte1]) + bytes([byte2]) + data[(len(data)//125)*125 :]
             listFrame.append(frame)
     return listFrame
 
@@ -95,24 +115,28 @@ def mainThread(conn, addr):
                 #j = j + 1
                 while True:
                     frame = bytearray(conn.recv(65536))
-                    byte1 = frame[0]
-                    fin = byte1 >> 7
-                    opcode = byte1 & 0x0F
+                    if(frame):
+                        byte1 = frame[0]
+                        fin = byte1 >> 7
+                        opcode = byte1 & 0x0F
 
-                    if (opcode == 0x8):
-                        return 
-                        #kirim close
-                    if (opcode == 0x1):
-                        isText = True
-                        data = b''
-                    elif (opcode == 0x2):
-                        isText = False
-                        data = b''
+                        if (opcode == 0x8):
+                            frame_close = build_close_frame(frame)
+                            conn.sendall(frame_close)
+                            conn.close()
+                            return 
+                            #kirim close
+                        if (opcode == 0x1):
+                            isText = True
+                            data = b''
+                        elif (opcode == 0x2):
+                            isText = False
+                            data = b''
 
-                    data += decodeFrame(frame, data)
-                    if (fin == 1):
-                        #print("fin " + str(j))
-                        break
+                        data += decodeFrame(frame)
+                        if (fin == 1):
+                            #print("fin " + str(j))
+                            break
 
                 if (isText):
                     #print(data)
@@ -120,15 +144,16 @@ def mainThread(conn, addr):
                     if ("!echo " in decoded_data):
                         #print("masuk !echo")
                         phrase = decoded_data.replace("!echo ", "")
-                        listFrame = build_frame(data, isText)
+                        listFrame = build_frame(phrase.encode(), isText)
                         for i in listFrame :
+                            print(i)
                             conn.sendall(i)
                     elif ("!submission" in decoded_data):
                         #print("masuk !submission")
                         try:
                             file = open("Simple-Websocket-Server.zip",'rb')
                         except IOError:
-                            print('Unable to open', filename)
+                            print('Unable to open file')
                             return    
                         bytes_from_file = file.read()
                         listFrame = build_frame(bytes_from_file,False) #isText is False
