@@ -146,11 +146,11 @@ def mainThread(conn, addr):
                                 break
                         else:
                             ping_data = decodeFrame(frame)
-                            ping_frame = build_frame(ping_data,data_type)
-                            conn.sendall(ping_frame[0])
+                            pong_frame = build_frame(ping_data,data_type)
+                            print(pong_frame[0])
+                            conn.sendall(pong_frame[0])
 
                 if (data_type == 'text'):
-                    #print(data)
                     decoded_data = data.decode()
                     if ("!echo " in decoded_data):
                         #print("masuk !echo")
@@ -168,8 +168,9 @@ def mainThread(conn, addr):
                             return    
                         bytes_from_file = file.read()
                         file.close()
-                        #original_checksum = hashlib.md5(bytes_from_file).hexdigest()
-                        #print(original_checksum)
+                        original_checksum = hashlib.md5(bytes_from_file).hexdigest()
+                        # print("checksum original di submission : ")
+                        # print(original_checksum)
                         print(bytes_from_file)
                         listFrame = build_frame(bytes_from_file,'binary') #data_type is binary
                         for i in listFrame :
@@ -179,6 +180,8 @@ def mainThread(conn, addr):
                     print("!bukan text")
                     #cek cheksum 
                     returned_checksum = hashlib.md5(data).hexdigest()
+                    print('udh dapet returned_checksum : ')
+                    print(returned_checksum)
                     try:
                         file = open("Simple-Websocket-Server.zip",'rb')
                     except IOError:
@@ -187,13 +190,19 @@ def mainThread(conn, addr):
                     bytes_from_file = file.read()
                     file.close()
                     original_checksum = hashlib.md5(bytes_from_file).hexdigest()
+                    print('udh dapet original_checksum : ')
                     print(original_checksum)
-                    if(returned_checksum == original_checksum):
-                        response_frame = build_frame(bytes([1]),'text')
+                    if(returned_checksum.lower() == original_checksum.lower()):
+                        print('checksum sama')
+                        response_frame = build_frame('1'.encode(),'text')
+                        print(response_frame[0])
+                        print('udh kirim response_frame')
                     else:
-                        response_frame = build_frame(bytes([0]),'text')
-                    conn.sendall(response_frame)
-
+                        print('checksum beda')
+                        response_frame = build_frame('0'.encode(),'text')
+                        print(response_frame[0])
+                        print('udh kirim response_frame')
+                    conn.sendall(response_frame[0]) 
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((HOST, PORT))
