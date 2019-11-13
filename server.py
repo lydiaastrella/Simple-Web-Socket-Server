@@ -68,13 +68,11 @@ def build_frame(data, data_type):
         opcode = 0xA
 
     if (len(data)//125 == 0):
-        #print('div 125 = 0')
         fin = 0x1
         payload_len = len(data)
         byte1 = fin << 7 | opcode
         byte2 = mask << 7 | payload_len
         frame = bytes([byte1]) + bytes([byte2]) + data
-        #print(frame)
         listFrame.append(frame)
     else :
         for i in range(len(data)//125):
@@ -112,10 +110,7 @@ def mainThread(conn, addr):
                     
             conn.sendall(handShake(key))
 
-            #j = 1
             while True:
-                #print(j)
-                #j = j + 1
                 while True:
                     frame = bytearray(conn.recv(65536))
                     if(frame):
@@ -136,31 +131,25 @@ def mainThread(conn, addr):
                             data_type = 'binary'
                             data = b''
                         elif (opcode == 0x9):
-                            print('received ping')
                             data_type = 'ping'
 
                         if(data_type != 'ping'):
                             data += decodeFrame(frame)
                             if (fin == 1):
-                                #print("fin " + str(j))
                                 break
                         else:
                             ping_data = decodeFrame(frame)
                             pong_frame = build_frame(ping_data,data_type)
-                            print(pong_frame[0])
                             conn.sendall(pong_frame[0])
 
                 if (data_type == 'text'):
                     decoded_data = data.decode()
                     if ("!echo " in decoded_data):
-                        #print("masuk !echo")
                         phrase = decoded_data.replace("!echo ", "")
                         listFrame = build_frame(phrase.encode(), data_type)
                         for i in listFrame :
-                            print(i)
                             conn.sendall(i)
                     elif ("!submission" in decoded_data):
-                        #print("masuk !submission")
                         try:
                             file = open("Simple-Websocket-Server.zip",'rb')
                         except IOError:
@@ -169,19 +158,12 @@ def mainThread(conn, addr):
                         bytes_from_file = file.read()
                         file.close()
                         original_checksum = hashlib.md5(bytes_from_file).hexdigest()
-                        # print("checksum original di submission : ")
-                        # print(original_checksum)
-                        print(bytes_from_file)
-                        listFrame = build_frame(bytes_from_file,'binary') #data_type is binary
+                        listFrame = build_frame(bytes_from_file,'binary')
                         for i in listFrame :
                             conn.sendall(i)
-                        #print("beres !submission")
                 elif(data_type == 'binary'):
-                    print("!bukan text")
                     #cek cheksum 
                     returned_checksum = hashlib.md5(data).hexdigest()
-                    print('udh dapet returned_checksum : ')
-                    print(returned_checksum)
                     try:
                         file = open("Simple-Websocket-Server.zip",'rb')
                     except IOError:
@@ -190,18 +172,10 @@ def mainThread(conn, addr):
                     bytes_from_file = file.read()
                     file.close()
                     original_checksum = hashlib.md5(bytes_from_file).hexdigest()
-                    print('udh dapet original_checksum : ')
-                    print(original_checksum)
                     if(returned_checksum.lower() == original_checksum.lower()):
-                        print('checksum sama')
                         response_frame = build_frame('1'.encode(),'text')
-                        print(response_frame[0])
-                        print('udh kirim response_frame')
                     else:
-                        print('checksum beda')
                         response_frame = build_frame('0'.encode(),'text')
-                        print(response_frame[0])
-                        print('udh kirim response_frame')
                     conn.sendall(response_frame[0]) 
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

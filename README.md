@@ -16,6 +16,6 @@ Kemudian jalankan websocket client yang akan digunakan agar terhubung dengan ser
 
 | NIM      | Nama                  | Apa yang dikerjakan                                          | Persentase kontribusi |
 | -------- | --------------------- | ------------------------------------------------------------ | --------------------- |
-| 13517019 | Lydia Astrella Wiguna | Inisiasi, handshake, frame building/parsing, ping & pong, !echo, !submission, checksum, debugging | 35%                   |
+| 13517019 | Lydia Astrella Wiguna | Inisiasi, handshake, frame building/parsing, !echo, !submission, checksum, ping & pong, debugging | 35%                   |
 | 13517031 | Karina Iswara         | Inisiasi, handshake, frame building/parsing, !echo, !submission, checksum, debugging | 35%                   |
-| 13517142 | Saskia Imani          | Frame building/parsing, ping & pong, !submission, checksum, debugging, readme | 30%                   |
+| 13517142 | Saskia Imani          | Frame building/parsing, !submission, checksum, ping & pong, debugging, readme | 30%                   |
