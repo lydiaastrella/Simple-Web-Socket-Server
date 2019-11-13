@@ -41,29 +41,32 @@ async def hello():
 
         # print(f"> {name}")
 
-        greeting = await websocket.recv()
-        time.sleep(5)
-        print(f"< {greeting}")
+        # greeting = await websocket.recv()
+        # time.sleep(5)
+        # print(f"< {greeting}")
 
-        await websocket.send("!submission")
+        # await websocket.send("!submission")
         # print(f"> {name}")
 
-        greeting = await websocket.recv()
-        fileA = open("teste.zip",'wb')
-        fileA.write(greeting)
-        fileA.close()
-        time.sleep(5)
+        # greeting = await websocket.recv()
+        # fileA = open("teste.zip",'wb')
+        # fileA.write(greeting)
+        # fileA.close()
+        # time.sleep(5)
+
+        name = input("What's your name? ")
         
         pong_waiter = await websocket.ping()
+        await pong_waiter
         time.sleep(5)
         print(f"< {pong_waiter}")
         
-        await websocket.send(greeting)
-        # print(f"> {name}")
+        # await websocket.send(greeting)
+        # # print(f"> {name}")
 
-        greeting = await websocket.recv()
-        time.sleep(5)
-        print(f"< {greeting}")
+        # greeting = await websocket.recv()
+        # time.sleep(5)
+        # print(f"< {greeting}")
         
 
 asyncio.get_event_loop().run_until_complete(hello())

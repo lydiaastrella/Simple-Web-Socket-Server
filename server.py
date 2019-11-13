@@ -55,18 +55,20 @@ HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
 PORT = 8080        # Port to listen on (non-privileged ports are > 1023)
 MAGIC_STRING = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11" #string to concatenate to key
 
-def build_frame(data, isText):
+def build_frame(data, data_type):
     listFrame = []
     frame = b''
     mask = 0x0
 
-    if (isText):
+    if (data_type == 'text'):
         opcode = 0x1
-    else :
+    elif(data_type == 'binary') :
         opcode = 0x2
-    
+    else:
+        opcode = 0xA
+
     if (len(data)//125 == 0):
-        print('div 125 = 0')
+        #print('div 125 = 0')
         fin = 0x1
         payload_len = len(data)
         byte1 = fin << 7 | opcode
@@ -85,6 +87,7 @@ def build_frame(data, isText):
             byte2 = mask << 7 | payload_len
             frame = bytes([byte1]) + bytes([byte2]) + data[i*125 : (i+1) *125]
             listFrame.append(frame)
+            opcode = 0x0
         if (len(data) % 125 != 0):
             fin = 0x1
             payload_len = len(data) % 125
@@ -126,25 +129,33 @@ def mainThread(conn, addr):
                             conn.close()
                             return 
                             #kirim close
-                        if (opcode == 0x1):
-                            isText = True
+                        elif (opcode == 0x1):
+                            data_type = 'text'
                             data = b''
                         elif (opcode == 0x2):
-                            isText = False
+                            data_type = 'binary'
                             data = b''
+                        elif (opcode == 0x9):
+                            print('received ping')
+                            data_type = 'ping'
 
-                        data += decodeFrame(frame)
-                        if (fin == 1):
-                            #print("fin " + str(j))
-                            break
+                        if(data_type != 'ping'):
+                            data += decodeFrame(frame)
+                            if (fin == 1):
+                                #print("fin " + str(j))
+                                break
+                        else:
+                            ping_data = decodeFrame(frame)
+                            ping_frame = build_frame(ping_data,data_type)
+                            conn.sendall(ping_frame[0])
 
-                if (isText):
+                if (data_type == 'text'):
                     #print(data)
                     decoded_data = data.decode()
                     if ("!echo " in decoded_data):
                         #print("masuk !echo")
                         phrase = decoded_data.replace("!echo ", "")
-                        listFrame = build_frame(phrase.encode(), isText)
+                        listFrame = build_frame(phrase.encode(), data_type)
                         for i in listFrame :
                             print(i)
                             conn.sendall(i)
@@ -156,14 +167,33 @@ def mainThread(conn, addr):
                             print('Unable to open file')
                             return    
                         bytes_from_file = file.read()
-                        listFrame = build_frame(bytes_from_file,False) #isText is False
+                        file.close()
+                        #original_checksum = hashlib.md5(bytes_from_file).hexdigest()
+                        #print(original_checksum)
+                        print(bytes_from_file)
+                        listFrame = build_frame(bytes_from_file,'binary') #data_type is binary
                         for i in listFrame :
                             conn.sendall(i)
                         #print("beres !submission")
-                else:
+                elif(data_type == 'binary'):
                     print("!bukan text")
                     #cek cheksum 
-                        
+                    returned_checksum = hashlib.md5(data).hexdigest()
+                    try:
+                        file = open("Simple-Websocket-Server.zip",'rb')
+                    except IOError:
+                        print('Unable to open file')
+                        return    
+                    bytes_from_file = file.read()
+                    file.close()
+                    original_checksum = hashlib.md5(bytes_from_file).hexdigest()
+                    print(original_checksum)
+                    if(returned_checksum == original_checksum):
+                        response_frame = build_frame(bytes([1]),'text')
+                    else:
+                        response_frame = build_frame(bytes([0]),'text')
+                    conn.sendall(response_frame)
+
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((HOST, PORT))
